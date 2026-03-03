@@ -15,9 +15,9 @@
 #include "stm32f4xx_hal.h"              // Keil::Device:STM32Cube HAL:Common
 #include "Board_LED.h"                  // ::Board Support:LED
 #include "Board_Buttons.h"              // ::Board Support:Buttons
-#include "Board_ADC.h"                  // ::Board Support:A/D Converter
-#include "Board_GLCD.h"                 // ::Board Support:Graphic LCD
-#include "GLCD_Config.h"                // Keil.MCBSTM32F400::Board Support:Graphic LCD
+#include "adc.h"                  
+//#include "Board_GLCD.h"                 // ::Board Support:Graphic LCD
+#include "lcd.h"               
 
 // Main stack size must be multiple of 8 Bytes
 #define APP_MAIN_STK_SZ (1024U)
@@ -27,8 +27,8 @@ const osThreadAttr_t app_main_attr = {
   .stack_size = sizeof(app_main_stk)
 };
 
-extern GLCD_FONT GLCD_Font_6x8;
-extern GLCD_FONT GLCD_Font_16x24;
+//extern GLCD_FONT GLCD_Font_6x8;
+//extern GLCD_FONT GLCD_Font_16x24;
 
 extern uint16_t AD_in          (uint32_t ch);
 extern uint8_t  get_button     (void);
@@ -58,31 +58,36 @@ __NO_RETURN void app_main (void *arg);
 uint16_t AD_in (uint32_t ch) {
   int32_t val = 0;
 
+	
   if (ch == 0) {
-    ADC_StartConversion();
-    while (ADC_ConversionDone () < 0);
-    val = ADC_GetValue();
+	ADC_HandleTypeDef adchandle; //handler definition
+		ADC1_pins_F429ZI_config();
+		ADC_Init_Single_Conversion(&adchandle , ADC1); //ADC1 configuration
+		val = (int32_t)ADC_getVoltage(&adchandle , 10 );
+//    ADC_StartConversion();
+//    while (ADC_ConversionDone () < 0);
+//    val = ADC_GetValue();
   }
   return ((uint16_t)val);
 }
 
 /* Read digital inputs */
 uint8_t get_button (void) {
-  return ((uint8_t)Buttons_GetState ());
+//  return ((uint8_t)Buttons_GetState ());
 }
 
 /* IP address change notification */
-void netDHCP_Notify (uint32_t if_num, uint8_t option, const uint8_t *val, uint32_t len) {
+//void netDHCP_Notify (uint32_t if_num, uint8_t option, const uint8_t *val, uint32_t len) {
 
-  (void)if_num;
-  (void)val;
-  (void)len;
+//  (void)if_num;
+//  (void)val;
+//  (void)len;
 
-  if (option == NET_DHCP_OPTION_IP_ADDRESS) {
-    /* IP address change, trigger LCD update */
-    osThreadFlagsSet (TID_Display, 0x01);
-  }
-}
+//  if (option == NET_DHCP_OPTION_IP_ADDRESS) {
+//    /* IP address change, trigger LCD update */
+//    osThreadFlagsSet (TID_Display, 0x01);
+//  }
+//}
 
 /*----------------------------------------------------------------------------
   Thread 'Display': LCD display handler
@@ -91,34 +96,41 @@ static __NO_RETURN void Display (void *arg) {
   static uint8_t ip_addr[NET_ADDR_IP6_LEN];
   static char    ip_ascii[40];
   static char    buf[24];
-  uint32_t x = 0;
 
   (void)arg;
 
-  GLCD_Initialize         ();
-  GLCD_SetBackgroundColor (GLCD_COLOR_BLUE);
-  GLCD_SetForegroundColor (GLCD_COLOR_WHITE);
-  GLCD_ClearScreen        ();
-  GLCD_SetFont            (&GLCD_Font_16x24);
-  GLCD_DrawString         (x*16U, 1U*24U, "       MDK-MW       ");
-  GLCD_DrawString         (x*16U, 2U*24U, "HTTP Server example ");
+	LCD_reset();
+	LCD_Init();
+	LCD_clean();
+	
+	
+	
+//  GLCD_Initialize         ();
+//  GLCD_SetBackgroundColor (GLCD_COLOR_BLUE);
+//  GLCD_SetForegroundColor (GLCD_COLOR_WHITE);
+//  GLCD_ClearScreen        ();
+//  GLCD_SetFont            (&GLCD_Font_16x24);
+	printLCD("       MDK-MW       ", 1);	
+	printLCD("HTTP Server example ", 2);
+//  GLCD_DrawString         (x*16U, 1U*24U, "       MDK-MW       ");
+//  GLCD_DrawString         (x*16U, 2U*24U, "HTTP Server example ");
 
-  GLCD_DrawString (x*16U, 4U*24U, "IP4:Waiting for DHCP");
+//  GLCD_DrawString (x*16U, 4U*24U, "IP4:Waiting for DHCP");
 
-  /* Print Link-local IPv6 address */
-  netIF_GetOption (NET_IF_CLASS_ETH,
-                   netIF_OptionIP6_LinkLocalAddress, ip_addr, sizeof(ip_addr));
+//  /* Print Link-local IPv6 address */
+//  netIF_GetOption (NET_IF_CLASS_ETH,
+//                   netIF_OptionIP6_LinkLocalAddress, ip_addr, sizeof(ip_addr));
 
-  netIP_ntoa(NET_ADDR_IP6, ip_addr, ip_ascii, sizeof(ip_ascii));
+//  netIP_ntoa(NET_ADDR_IP6, ip_addr, ip_ascii, sizeof(ip_ascii));
 
-  sprintf (buf, "IP6:%.16s", ip_ascii);
-  GLCD_DrawString ( x    *16U, 5U*24U, buf);
-  sprintf (buf, "%s", ip_ascii+16);
-  GLCD_DrawString ((x+10U)*16U, 6U*24U, buf);
+//  sprintf (buf, "IP6:%.16s", ip_ascii);
+////  GLCD_DrawString ( x    *16U, 5U*24U, buf);
+//  sprintf (buf, "%s", ip_ascii+16);
+////  GLCD_DrawString ((x+10U)*16U, 6U*24U, buf);
 
   while(1) {
     /* Wait for signal from DHCP */
-    osThreadFlagsWait (0x01U, osFlagsWaitAny, osWaitForever);
+//    osThreadFlagsWait (0x01U, osFlagsWaitAny, osWaitForever);
 
     /* Retrieve and print IPv4 address */
     netIF_GetOption (NET_IF_CLASS_ETH,
@@ -126,14 +138,17 @@ static __NO_RETURN void Display (void *arg) {
 
     netIP_ntoa (NET_ADDR_IP4, ip_addr, ip_ascii, sizeof(ip_ascii));
 
-    sprintf (buf, "IP4:%-16s",ip_ascii);
-    GLCD_DrawString (x*16U, 4U*24U, buf);
+//    sprintf (buf, "IP4:%-16s",ip_ascii);
+//		printLCD(buf, 2);
+//    GLCD_DrawString (x*16U, 4U*24U, buf);
 
     /* Display user text lines */
     sprintf (buf, "%-20s", lcd_text[0]);
-    GLCD_DrawString (x*16U, 7U*24U, buf);
+		printLCD(lcd_text[0], 1);
+//    GLCD_DrawString (x*16U, 7U*24U, buf);
     sprintf (buf, "%-20s", lcd_text[1]);
-    GLCD_DrawString (x*16U, 8U*24U, buf);
+		printLCD(lcd_text[1], 2);
+//    GLCD_DrawString (x*16U, 8U*24U, buf);
   }
 }
 
@@ -167,8 +182,9 @@ __NO_RETURN void app_main (void *arg) {
   (void)arg;
 
   LED_Initialize();
-  Buttons_Initialize();
-  ADC_Initialize();
+ // Buttons_Initialize();
+
+	
 
   netInitialize ();
 
