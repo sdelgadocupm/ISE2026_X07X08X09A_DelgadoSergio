@@ -418,6 +418,11 @@
               <FileType>5</FileType>
               <FilePath>.\lcd.h</FilePath>
             </File>
+            <File>
+              <FileName>stm32f4xx_hal_msp.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\stm32f4xx_hal_msp.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>

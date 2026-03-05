@@ -36,8 +36,7 @@ void Thread (void *argument) {
 	LCD_Init();
 	LCD_clean();
 	
-	
-	/*##-1- Configure the RTC peripheral #######################################*/
+	 /*##-1- Configure the RTC peripheral #######################################*/
   /* Configure RTC prescaler and RTC data registers */
   /* RTC configured as follows:
       - Hour Format    = Format 24
@@ -54,8 +53,14 @@ void Thread (void *argument) {
   RtcHandle.Init.OutPutPolarity = RTC_OUTPUT_POLARITY_HIGH;
   RtcHandle.Init.OutPutType = RTC_OUTPUT_TYPE_OPENDRAIN;
   __HAL_RTC_RESET_HANDLE_STATE(&RtcHandle);
+  if (HAL_RTC_Init(&RtcHandle) != HAL_OK)
+  {
+    /* Initialization Error */
+    //Error_Handler();
+  }
+ 
 
-	/*##-2- Check if Data stored in BackUp register1: No Need to reconfigure RTC#*/
+  /*##-2- Check if Data stored in BackUp register1: No Need to reconfigure RTC#*/
   /* Read the Back Up Register 1 Data */
   if (HAL_RTCEx_BKUPRead(&RtcHandle, RTC_BKP_DR1) != 0x32F2)
   {
@@ -64,20 +69,38 @@ void Thread (void *argument) {
   }
   else
   {
+    /* Check if the Power On Reset flag is set */
+    if (__HAL_RCC_GET_FLAG(RCC_FLAG_PORRST) != RESET)
+    {
+      
+    }
+    /* Check if Pin Reset flag is set */
+    if (__HAL_RCC_GET_FLAG(RCC_FLAG_PINRST) != RESET)
+    {
+     
+    }
     /* Clear source Reset Flag */
     __HAL_RCC_CLEAR_RESET_FLAGS();
   }
-		
+
+	
+	
   while (1) {
 
 		/*##-3- Display the updated Time and Date ################################*/
     RTC_CalendarShow(aShowTime, aShowDate);
-	//	printLCD(aShowTime, 1);
-	//	printLCD(aShowDate, 2);
+		printLCD(aShowTime, 1);
+		printLCD(aShowDate, 2);
+		osDelay(250);
     osThreadYield();                            // suspend thread
   }
 }
 
+/**
+  * @brief  Configure the current time and date.
+  * @param  None
+  * @retval None
+  */
 static void RTC_CalendarConfig(void)
 {
   RTC_DateTypeDef sdatestructure;
@@ -89,7 +112,12 @@ static void RTC_CalendarConfig(void)
   sdatestructure.Month = RTC_MONTH_FEBRUARY;
   sdatestructure.Date = 0x18;
   sdatestructure.WeekDay = RTC_WEEKDAY_TUESDAY;
-
+  
+  if(HAL_RTC_SetDate(&RtcHandle,&sdatestructure,RTC_FORMAT_BCD) != HAL_OK)
+  {
+    /* Initialization Error */
+    //Error_Handler();
+  }
 
   /*##-2- Configure the Time #################################################*/
   /* Set Time: 02:00:00 */
@@ -100,12 +128,23 @@ static void RTC_CalendarConfig(void)
   stimestructure.DayLightSaving = RTC_DAYLIGHTSAVING_NONE ;
   stimestructure.StoreOperation = RTC_STOREOPERATION_RESET;
 
-  
+  if (HAL_RTC_SetTime(&RtcHandle, &stimestructure, RTC_FORMAT_BCD) != HAL_OK)
+  {
+    /* Initialization Error */
+    //Error_Handler();
+  }
 
   /*##-3- Writes a data in a RTC Backup data Register1 #######################*/
   HAL_RTCEx_BKUPWrite(&RtcHandle, RTC_BKP_DR1, 0x32F2);
 }
 
+
+/**
+  * @brief  Display the current time and date.
+  * @param  showtime : pointer to buffer
+  * @param  showdate : pointer to buffer
+  * @retval None
+  */
 static void RTC_CalendarShow(uint8_t *showtime, uint8_t *showdate)
 {
   RTC_DateTypeDef sdatestructureget;
@@ -116,8 +155,7 @@ static void RTC_CalendarShow(uint8_t *showtime, uint8_t *showdate)
   /* Get the RTC current Date */
   HAL_RTC_GetDate(&RtcHandle, &sdatestructureget, RTC_FORMAT_BIN);
   /* Display time Format : hh:mm:ss */
-  sprintf((char *)showtime, "%2d:%2d:%2d", stimestructureget.Hours, stimestructureget.Minutes, stimestructureget.Seconds);
+  sprintf((char *)showtime, "%02d:%02d:%02d", stimestructureget.Hours, stimestructureget.Minutes, stimestructureget.Seconds);
   /* Display date Format : mm-dd-yy */
-  sprintf((char *)showdate, "%2d-%2d-%2d", sdatestructureget.Month, sdatestructureget.Date, 2000 + sdatestructureget.Year);
+  sprintf((char *)showdate, "%02d-%02d-%02d", sdatestructureget.Month, sdatestructureget.Date, 2000 + sdatestructureget.Year);
 }
-
