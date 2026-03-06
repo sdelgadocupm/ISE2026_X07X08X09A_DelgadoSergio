@@ -3,6 +3,7 @@
 #include "Thread.h"
 #include "lcd.h"
 
+
 /*----------------------------------------------------------------------------
  *      Thread 1 'Thread_Name': Sample thread
  *---------------------------------------------------------------------------*/
@@ -10,6 +11,8 @@
 osThreadId_t tid_Thread;                        // thread id
  
 RTC_HandleTypeDef RtcHandle;
+RTC_AlarmTypeDef sAlarm;
+RTC_TimeTypeDef sTime;
 
 /* Buffers used for displaying Time and Date */
 uint8_t aShowTime[50] = {0};
@@ -17,6 +20,7 @@ uint8_t aShowDate[50] = {0};
 
 static void RTC_CalendarConfig(void);
 static void RTC_CalendarShow(uint8_t *showtime, uint8_t *showdate);
+static void initLEDs(void);
  
 void Thread (void *argument);                   // thread function
  
@@ -35,6 +39,8 @@ void Thread (void *argument) {
 	LCD_reset();
 	LCD_Init();
 	LCD_clean();
+	
+	initLEDs();
 	
 	 /*##-1- Configure the RTC peripheral #######################################*/
   /* Configure RTC prescaler and RTC data registers */
@@ -82,8 +88,18 @@ void Thread (void *argument) {
     /* Clear source Reset Flag */
     __HAL_RCC_CLEAR_RESET_FLAGS();
   }
-
 	
+	HAL_NVIC_EnableIRQ(RTC_Alarm_IRQn);
+	
+	sAlarm.Alarm=RTC_ALARM_A;
+	sAlarm.AlarmMask=RTC_ALARMMASK_DATEWEEKDAY|RTC_ALARMMASK_HOURS|RTC_ALARMMASK_MINUTES;
+	HAL_RTC_GetTime(&RtcHandle, &sTime, RTC_FORMAT_BIN);
+	sAlarm.AlarmTime.Seconds=sTime.Seconds+5;
+	if(sAlarm.AlarmTime.Seconds>59){
+		sAlarm.AlarmTime.Seconds=sAlarm.AlarmTime.Seconds-60;
+	}
+	
+	HAL_RTC_SetAlarm_IT(&RtcHandle, &sAlarm, RTC_FORMAT_BIN);
 	
   while (1) {
 
@@ -95,6 +111,23 @@ void Thread (void *argument) {
     osThreadYield();                            // suspend thread
   }
 }
+
+void HAL_RTC_AlarmAEventCallback (RTC_HandleTypeDef * hrtc){
+		
+	HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_0);
+	sAlarm.Alarm=RTC_ALARM_A;
+	sAlarm.AlarmMask=RTC_ALARMMASK_DATEWEEKDAY|RTC_ALARMMASK_HOURS|RTC_ALARMMASK_MINUTES;
+	HAL_RTC_GetTime(&RtcHandle, &sTime, RTC_FORMAT_BIN);
+	sAlarm.AlarmTime.Seconds=sTime.Seconds+5;
+	if(sAlarm.AlarmTime.Seconds>59){
+		sAlarm.AlarmTime.Seconds=sAlarm.AlarmTime.Seconds-60;
+	}
+	
+	HAL_RTC_SetAlarm_IT(&RtcHandle, &sAlarm, RTC_FORMAT_BIN);
+	
+	
+}
+
 
 /**
   * @brief  Configure the current time and date.
@@ -159,3 +192,29 @@ static void RTC_CalendarShow(uint8_t *showtime, uint8_t *showdate)
   /* Display date Format : mm-dd-yy */
   sprintf((char *)showdate, "%02d-%02d-%02d", sdatestructureget.Month, sdatestructureget.Date, 2000 + sdatestructureget.Year);
 }
+
+static void initLEDs(void){
+  
+  GPIO_InitTypeDef GPIOB_InitStruct;
+  
+  __HAL_RCC_GPIOB_CLK_ENABLE();
+	
+	GPIOB_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;	
+	GPIOB_InitStruct.Pull = GPIO_PULLUP;
+	GPIOB_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+	
+	//LD1
+	GPIOB_InitStruct.Pin = GPIO_PIN_0;
+	HAL_GPIO_Init(GPIOB, &GPIOB_InitStruct);
+	
+	//LD2
+	GPIOB_InitStruct.Pin = GPIO_PIN_7;
+	HAL_GPIO_Init(GPIOB, &GPIOB_InitStruct);
+	
+	//LD3
+	GPIOB_InitStruct.Pin = GPIO_PIN_14;
+	HAL_GPIO_Init(GPIOB, &GPIOB_InitStruct);
+}
+
+
+
