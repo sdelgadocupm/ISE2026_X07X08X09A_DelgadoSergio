@@ -419,9 +419,14 @@
               <FilePath>.\lcd.h</FilePath>
             </File>
             <File>
-              <FileName>stm32f4xx_hal_msp.c</FileName>
+              <FileName>rtc.c</FileName>
               <FileType>1</FileType>
-              <FilePath>.\stm32f4xx_hal_msp.c</FilePath>
+              <FilePath>.\rtc.c</FilePath>
+            </File>
+            <File>
+              <FileName>rtc.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\rtc.h</FilePath>
             </File>
           </Files>
         </Group>
