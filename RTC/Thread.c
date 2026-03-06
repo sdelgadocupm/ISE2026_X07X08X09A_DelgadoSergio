@@ -9,10 +9,18 @@
  *---------------------------------------------------------------------------*/
  
 osThreadId_t tid_Thread;                        // thread id
+
+uint8_t cnt_led=0;
+uint8_t alarma=0;
+
+/*----- Periodic Timer Example -----*/
+osTimerId_t tim_id2;                            // timer id
+static uint32_t exec2;                          // argument for the timer call back function
+static void Timer2_Callback (void const *arg);
+
  
 RTC_HandleTypeDef RtcHandle;
 RTC_AlarmTypeDef sAlarm;
-RTC_TimeTypeDef sTime;
 
 /* Buffers used for displaying Time and Date */
 uint8_t aShowTime[50] = {0};
@@ -30,6 +38,10 @@ int Init_Thread (void) {
   if (tid_Thread == NULL) {
     return(-1);
   }
+	
+	// Create periodic timer
+  exec2 = 2U;
+  tim_id2 = osTimerNew((osTimerFunc_t)&Timer2_Callback, osTimerPeriodic, &exec2, NULL);
  
   return(0);
 }
@@ -93,11 +105,7 @@ void Thread (void *argument) {
 	
 	sAlarm.Alarm=RTC_ALARM_A;
 	sAlarm.AlarmMask=RTC_ALARMMASK_DATEWEEKDAY|RTC_ALARMMASK_HOURS|RTC_ALARMMASK_MINUTES;
-	HAL_RTC_GetTime(&RtcHandle, &sTime, RTC_FORMAT_BIN);
-	sAlarm.AlarmTime.Seconds=sTime.Seconds+5;
-	if(sAlarm.AlarmTime.Seconds>59){
-		sAlarm.AlarmTime.Seconds=sAlarm.AlarmTime.Seconds-60;
-	}
+	sAlarm.AlarmTime.Seconds=0;
 	
 	HAL_RTC_SetAlarm_IT(&RtcHandle, &sAlarm, RTC_FORMAT_BIN);
 	
@@ -107,6 +115,10 @@ void Thread (void *argument) {
     RTC_CalendarShow(aShowTime, aShowDate);
 		printLCD(aShowTime, 1);
 		printLCD(aShowDate, 2);
+		if(alarma==1){
+			osTimerStart(tim_id2, 500U);
+			alarma=0;
+		}
 		osDelay(250);
     osThreadYield();                            // suspend thread
   }
@@ -114,18 +126,26 @@ void Thread (void *argument) {
 
 void HAL_RTC_AlarmAEventCallback (RTC_HandleTypeDef * hrtc){
 		
-	HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_0);
 	sAlarm.Alarm=RTC_ALARM_A;
 	sAlarm.AlarmMask=RTC_ALARMMASK_DATEWEEKDAY|RTC_ALARMMASK_HOURS|RTC_ALARMMASK_MINUTES;
-	HAL_RTC_GetTime(&RtcHandle, &sTime, RTC_FORMAT_BIN);
-	sAlarm.AlarmTime.Seconds=sTime.Seconds+5;
-	if(sAlarm.AlarmTime.Seconds>59){
-		sAlarm.AlarmTime.Seconds=sAlarm.AlarmTime.Seconds-60;
-	}
+	sAlarm.AlarmTime.Seconds=0;
 	
 	HAL_RTC_SetAlarm_IT(&RtcHandle, &sAlarm, RTC_FORMAT_BIN);
+	alarma=1;
 	
-	
+}
+
+
+// Periodic Timer Function
+static void Timer2_Callback (void const *arg) {
+  
+	HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_0);
+	if(cnt_led==9){
+		cnt_led=0;
+		osTimerStop(tim_id2);
+	}else{
+		cnt_led++;
+	}
 }
 
 
