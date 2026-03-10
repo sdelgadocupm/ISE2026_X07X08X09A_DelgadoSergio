@@ -7,6 +7,8 @@
  *----------------------------------------------------------------------------*/
 
 #include <stdio.h>
+#include <time.h>
+#include <string.h>
 
 #include "main.h"
 
@@ -27,12 +29,25 @@ const osThreadAttr_t app_main_attr = {
   .stack_size = sizeof(app_main_stk)
 };
 
-//extern GLCD_FONT GLCD_Font_6x8;
-//extern GLCD_FONT GLCD_Font_16x24;
 
 RTC_HandleTypeDef RtcHandle;
 //uint8_t aShowTime[50] = {0};
 //uint8_t aShowDate[50] = {0};
+
+//SNTP
+const NET_ADDR4 ntp_server = {NET_ADDR_IP4, 0, 178, 215, 228, 24 };
+static void time_callback (uint32_t seconds, uint32_t seconds_fraction);
+
+
+/*----- Periodic Timer Example -----*/
+osTimerId_t tim_id2;                            // timer id
+static uint32_t exec2;                          // argument for the timer call back function
+static void Timer2_Callback (void const *arg);
+
+uint8_t cnt_led=0;
+
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin); 
+
 
 extern uint16_t AD_in          (uint32_t ch);
 extern uint8_t  get_button     (void);
@@ -44,7 +59,9 @@ extern char lcd_text[2][20+1];
 extern osThreadId_t TID_Display;
 extern osThreadId_t TID_Led;
 extern osThreadId_t TID_Rtc;
+extern osThreadId_t TID_Sntp;
 
+static void initB1(void);
 
 bool LEDrun;
 char lcd_text[2][20+1] = { "LCD line 1",
@@ -54,12 +71,14 @@ char lcd_text[2][20+1] = { "LCD line 1",
 osThreadId_t TID_Display;
 osThreadId_t TID_Led;
 osThreadId_t TID_Rtc;
-													 
+osThreadId_t TID_Sntp;
+
 													 
 /* Thread declarations */
 static void BlinkLed (void *arg);
 static void Display  (void *arg);
 static void Rtc  (void *arg);
+static void Sntp  (void *arg);
 
 
 __NO_RETURN void app_main (void *arg);
@@ -74,9 +93,6 @@ uint16_t AD_in (uint32_t ch) {
 		ADC1_pins_F429ZI_config();
 		ADC_Init_Single_Conversion(&adchandle , ADC1); //ADC1 configuration
 		val = (int32_t)ADC_getVoltage(&adchandle , 10 );
-//    ADC_StartConversion();
-//    while (ADC_ConversionDone () < 0);
-//    val = ADC_GetValue();
   }
   return ((uint16_t)val);
 }
@@ -86,18 +102,7 @@ uint8_t get_button (void) {
 //  return ((uint8_t)Buttons_GetState ());
 }
 
-/* IP address change notification */
-//void netDHCP_Notify (uint32_t if_num, uint8_t option, const uint8_t *val, uint32_t len) {
 
-//  (void)if_num;
-//  (void)val;
-//  (void)len;
-
-//  if (option == NET_DHCP_OPTION_IP_ADDRESS) {
-//    /* IP address change, trigger LCD update */
-//    osThreadFlagsSet (TID_Display, 0x01);
-//  }
-//}
 
 /*----------------------------------------------------------------------------
   Thread 'Display': LCD display handler
@@ -106,6 +111,8 @@ static __NO_RETURN void Display (void *arg) {
   static uint8_t ip_addr[NET_ADDR_IP6_LEN];
   static char    ip_ascii[40];
   static char    buf[24];
+	
+	char lcd_text_aux[2][20+1];
 
   (void)arg;
 
@@ -115,32 +122,12 @@ static __NO_RETURN void Display (void *arg) {
 	
 	
 	
-//  GLCD_Initialize         ();
-//  GLCD_SetBackgroundColor (GLCD_COLOR_BLUE);
-//  GLCD_SetForegroundColor (GLCD_COLOR_WHITE);
-//  GLCD_ClearScreen        ();
-//  GLCD_SetFont            (&GLCD_Font_16x24);
+
 	printLCD("       MDK-MW       ", 1);	
 	printLCD("HTTP Server example ", 2);
-//  GLCD_DrawString         (x*16U, 1U*24U, "       MDK-MW       ");
-//  GLCD_DrawString         (x*16U, 2U*24U, "HTTP Server example ");
 
-//  GLCD_DrawString (x*16U, 4U*24U, "IP4:Waiting for DHCP");
-
-//  /* Print Link-local IPv6 address */
-//  netIF_GetOption (NET_IF_CLASS_ETH,
-//                   netIF_OptionIP6_LinkLocalAddress, ip_addr, sizeof(ip_addr));
-
-//  netIP_ntoa(NET_ADDR_IP6, ip_addr, ip_ascii, sizeof(ip_ascii));
-
-//  sprintf (buf, "IP6:%.16s", ip_ascii);
-////  GLCD_DrawString ( x    *16U, 5U*24U, buf);
-//  sprintf (buf, "%s", ip_ascii+16);
-////  GLCD_DrawString ((x+10U)*16U, 6U*24U, buf);
 
   while(1) {
-    /* Wait for signal from DHCP */
-//    osThreadFlagsWait (0x01U, osFlagsWaitAny, osWaitForever);
 
     /* Retrieve and print IPv4 address */
     netIF_GetOption (NET_IF_CLASS_ETH,
@@ -148,17 +135,18 @@ static __NO_RETURN void Display (void *arg) {
 
     netIP_ntoa (NET_ADDR_IP4, ip_addr, ip_ascii, sizeof(ip_ascii));
 
-//    sprintf (buf, "IP4:%-16s",ip_ascii);
-//		printLCD(buf, 2);
-//    GLCD_DrawString (x*16U, 4U*24U, buf);
 
     /* Display user text lines */
-    sprintf (buf, "%-20s", lcd_text[0]);
-		printLCD(lcd_text[0], 1);
-//    GLCD_DrawString (x*16U, 7U*24U, buf);
-    sprintf (buf, "%-20s", lcd_text[1]);
-		printLCD(lcd_text[1], 2);
-//    GLCD_DrawString (x*16U, 8U*24U, buf);
+		if(strcmp(lcd_text[0],lcd_text_aux[0])){
+			printLCD(lcd_text[0], 1);
+			strcpy(lcd_text_aux[0], lcd_text[0]);
+		}
+	
+		if(strcmp(lcd_text[1],lcd_text_aux[1])){
+			printLCD(lcd_text[1], 2);
+			strcpy(lcd_text_aux[1], lcd_text[1]);
+		}		
+
   }
 }
 
@@ -175,7 +163,7 @@ static __NO_RETURN void BlinkLed (void *arg) {
 	
 																
 																
-  LEDrun = true;
+  LEDrun = false;
   while(1) {
     /* Every 100 ms */
     if (LEDrun == true) {
@@ -192,6 +180,8 @@ static __NO_RETURN void BlinkLed (void *arg) {
   Thread 'RTC':
  *---------------------------------------------------------------------------*/
 static __NO_RETURN void Rtc (void *arg) {
+	uint8_t aShowTime[50] = {0};
+	uint8_t aShowDate[50] = {0};
 
   (void)arg;
 
@@ -199,8 +189,28 @@ static __NO_RETURN void Rtc (void *arg) {
 	checkBackUp(&RtcHandle);
 																
 	while(1) {
-//		RTC_CalendarShow(&RtcHandle, aShowTime, aShowDate);
-//		osDelay (100);
+		RTC_CalendarShow(&RtcHandle, aShowTime, aShowDate);
+		printLCD(aShowTime, 1);
+		printLCD(aShowDate, 2);
+		osDelay (100);
+  }
+}
+
+/*----------------------------------------------------------------------------
+  Thread 'SNTP':
+ *---------------------------------------------------------------------------*/
+static __NO_RETURN void Sntp (void *arg) {
+
+  (void)arg;
+	
+	osDelay(5000);
+	netSNTPc_GetTime ((NET_ADDR *)&ntp_server, time_callback);	
+	osTimerStart(tim_id2, 200U);
+
+	while(1) {
+		osDelay(180000);
+		netSNTPc_GetTime ((NET_ADDR *)&ntp_server, time_callback);
+		osTimerStart(tim_id2, 200U);
   }
 }
 
@@ -212,14 +222,101 @@ __NO_RETURN void app_main (void *arg) {
 
   LED_Initialize();
  // Buttons_Initialize();
-
+	initB1();
 	
+	// Create periodic timer
+  exec2 = 2U;
+  tim_id2 = osTimerNew((osTimerFunc_t)&Timer2_Callback, osTimerPeriodic, &exec2, NULL);
 
   netInitialize ();
 
   TID_Led     = osThreadNew (BlinkLed, NULL, NULL);
   TID_Display = osThreadNew (Display,  NULL, NULL);
   TID_Rtc = osThreadNew (Rtc,  NULL, NULL);
+  TID_Sntp = osThreadNew (Sntp,  NULL, NULL);
+	
+
 	
   osThreadExit();
 }
+
+
+static void time_callback (uint32_t seconds, uint32_t senconds_fraction){
+	struct tm  ts;
+  char       buf[80];
+	
+	
+	if(seconds != 0){
+	
+		ts = *localtime(&seconds);
+		
+		RTC_DateTypeDef sdate;
+		RTC_TimeTypeDef stime;
+		
+		sdate.Year = ts.tm_year-100;
+		sdate.Month = ts.tm_mon+1;
+		sdate.Date = ts.tm_mday;
+		sdate.WeekDay = ts.tm_wday;	
+		
+		stime.Hours = ts.tm_hour+1;
+		stime.Minutes = ts.tm_min;
+		stime.Seconds = ts.tm_sec;
+		stime.TimeFormat = RTC_HOURFORMAT12_AM;
+		stime.DayLightSaving = RTC_DAYLIGHTSAVING_NONE ;
+		stime.StoreOperation = RTC_STOREOPERATION_RESET;
+	
+		RTC_CalendarConfig(&RtcHandle, sdate, stime);
+		
+	}
+}
+
+// Periodic Timer Function
+static void Timer2_Callback (void const *arg) {
+  
+	HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_14);
+	if(cnt_led==19){
+		cnt_led=0;
+		osTimerStop(tim_id2);
+	}else{
+		cnt_led++;
+	}
+}
+
+//Funcion boton usuario(azul)
+static void initB1(void){
+  
+  GPIO_InitTypeDef GPIOC_InitStruct;
+  
+  __HAL_RCC_GPIOC_CLK_ENABLE();
+	
+	GPIOC_InitStruct.Mode = GPIO_MODE_IT_RISING;	
+	GPIOC_InitStruct.Pull = GPIO_NOPULL;
+	
+	GPIOC_InitStruct.Pin = GPIO_PIN_13;
+	HAL_GPIO_Init(GPIOC, &GPIOC_InitStruct);
+	
+	HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
+  
+}
+
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
+	if(GPIO_Pin == GPIO_PIN_13){
+		RTC_DateTypeDef sdate;
+		RTC_TimeTypeDef stime;
+		
+		sdate.Year = 0;
+		sdate.Month = 1;
+		sdate.Date = 1;
+		sdate.WeekDay = 6;	
+		
+		stime.Hours = 0;
+		stime.Minutes = 0;
+		stime.Seconds = 0;
+		stime.TimeFormat = RTC_HOURFORMAT12_AM;
+		stime.DayLightSaving = RTC_DAYLIGHTSAVING_NONE ;
+		stime.StoreOperation = RTC_STOREOPERATION_RESET;
+	
+		RTC_CalendarConfig(&RtcHandle, sdate, stime);
+	}
+}
+

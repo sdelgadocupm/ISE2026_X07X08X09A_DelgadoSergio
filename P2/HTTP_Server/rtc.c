@@ -88,7 +88,7 @@ void RTC_CalendarConfig(RTC_HandleTypeDef *hrtc, RTC_DateTypeDef sdatestructure,
 //  sdatestructure.Date = 0x18;
 //  sdatestructure.WeekDay = RTC_WEEKDAY_TUESDAY;
   
-  if(HAL_RTC_SetDate(hrtc,&sdatestructure,RTC_FORMAT_BCD) != HAL_OK)
+  if(HAL_RTC_SetDate(hrtc,&sdatestructure,RTC_FORMAT_BIN) != HAL_OK)
   {
     /* Initialization Error */
     //Error_Handler();
@@ -103,7 +103,7 @@ void RTC_CalendarConfig(RTC_HandleTypeDef *hrtc, RTC_DateTypeDef sdatestructure,
 //  stimestructure.DayLightSaving = RTC_DAYLIGHTSAVING_NONE ;
 //  stimestructure.StoreOperation = RTC_STOREOPERATION_RESET;
 
-  if (HAL_RTC_SetTime(hrtc, &stimestructure, RTC_FORMAT_BCD) != HAL_OK)
+  if (HAL_RTC_SetTime(hrtc, &stimestructure, RTC_FORMAT_BIN) != HAL_OK)
   {
     /* Initialization Error */
     //Error_Handler();
@@ -132,7 +132,7 @@ void RTC_CalendarShow(RTC_HandleTypeDef *hrtc, uint8_t *showtime, uint8_t *showd
   /* Display time Format : hh:mm:ss */
   sprintf((char *)showtime, "%02d:%02d:%02d", stimestructureget.Hours, stimestructureget.Minutes, stimestructureget.Seconds);
   /* Display date Format : mm-dd-yy */
-  sprintf((char *)showdate, "%02d-%02d-%02d", sdatestructureget.Month, sdatestructureget.Date, 2000 + sdatestructureget.Year);
+  sprintf((char *)showdate, "%02d-%02d-%02d", sdatestructureget.Date, sdatestructureget.Month, 2000 + sdatestructureget.Year);
 }
 
 
