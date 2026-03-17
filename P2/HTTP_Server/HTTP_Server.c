@@ -129,11 +129,11 @@ static __NO_RETURN void Display (void *arg) {
 
   while(1) {
 
-    /* Retrieve and print IPv4 address */
-    netIF_GetOption (NET_IF_CLASS_ETH,
-                     netIF_OptionIP4_Address, ip_addr, sizeof(ip_addr));
+//    /* Retrieve and print IPv4 address */
+//    netIF_GetOption (NET_IF_CLASS_ETH,
+//                     netIF_OptionIP4_Address, ip_addr, sizeof(ip_addr));
 
-    netIP_ntoa (NET_ADDR_IP4, ip_addr, ip_ascii, sizeof(ip_ascii));
+//    netIP_ntoa (NET_ADDR_IP4, ip_addr, ip_ascii, sizeof(ip_ascii));
 
 
     /* Display user text lines */
@@ -180,6 +180,7 @@ static __NO_RETURN void BlinkLed (void *arg) {
   Thread 'RTC':
  *---------------------------------------------------------------------------*/
 static __NO_RETURN void Rtc (void *arg) {
+	uint8_t aShowTime_aux[50] = {0};
 	uint8_t aShowTime[50] = {0};
 	uint8_t aShowDate[50] = {0};
 
@@ -190,9 +191,14 @@ static __NO_RETURN void Rtc (void *arg) {
 																
 	while(1) {
 		RTC_CalendarShow(&RtcHandle, aShowTime, aShowDate);
-		printLCD(aShowTime, 1);
-		printLCD(aShowDate, 2);
-		osDelay (100);
+		if(strcmp(aShowTime, aShowTime_aux)){
+			strcpy(aShowTime_aux, aShowTime);
+			strcpy(lcd_text[0], aShowTime);
+			strcpy(lcd_text[1], aShowDate);
+//			printLCD(aShowTime, 1);
+//			printLCD(aShowDate, 2);
+//			osDelay (100);
+		}
   }
 }
 
@@ -228,7 +234,7 @@ __NO_RETURN void app_main (void *arg) {
   exec2 = 2U;
   tim_id2 = osTimerNew((osTimerFunc_t)&Timer2_Callback, osTimerPeriodic, &exec2, NULL);
 
-  netInitialize ();
+  netInitialize();
 
   TID_Led     = osThreadNew (BlinkLed, NULL, NULL);
   TID_Display = osThreadNew (Display,  NULL, NULL);
@@ -248,6 +254,7 @@ static void time_callback (uint32_t seconds, uint32_t senconds_fraction){
 	
 	if(seconds != 0){
 	
+		seconds=seconds+3600;
 		ts = *localtime(&seconds);
 		
 		RTC_DateTypeDef sdate;
@@ -258,7 +265,7 @@ static void time_callback (uint32_t seconds, uint32_t senconds_fraction){
 		sdate.Date = ts.tm_mday;
 		sdate.WeekDay = ts.tm_wday;	
 		
-		stime.Hours = ts.tm_hour+1;
+		stime.Hours = ts.tm_hour;
 		stime.Minutes = ts.tm_min;
 		stime.Seconds = ts.tm_sec;
 		stime.TimeFormat = RTC_HOURFORMAT12_AM;
