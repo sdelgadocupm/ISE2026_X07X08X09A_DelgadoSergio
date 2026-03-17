@@ -376,7 +376,7 @@ uint32_t netCGI_Script (const char *env, char *buf, uint32_t buflen, uint32_t *p
       switch (env[2]) {
         case '1':
 					RTC_CalendarShow(&RtcHandle, aShowTime, aShowDate);
-          len = (uint32_t)sprintf (buf, &env[4], aShowTime);
+					len = (uint32_t)sprintf (buf, &env[4], aShowTime);
           break;
         case '2':
           len = (uint32_t)sprintf (buf, &env[4], aShowDate);
@@ -391,7 +391,7 @@ uint32_t netCGI_Script (const char *env, char *buf, uint32_t buflen, uint32_t *p
 		  switch (env[2]) {
 				case '1':
 					len = (uint32_t)sprintf (buf, &env[3], aShowTime);
-					break;
+				break;
 				case '2':
 					len = (uint32_t)sprintf (buf, &env[3], aShowDate);
 					break;
